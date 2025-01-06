@@ -36,14 +36,14 @@ export const Flow = (v, ...fns) => Pipe(...fns)(v);
 
 export const OnUN = (v, getV) => (v === UN ? getV() : v);
 
-export const Lazy = get => {
-  let _ = () => {
-    const v = get();
+export const Lazy = (get = I) => {
+  let _ = a => {
+    const v = get(a);
     get = UN;
     _ = () => v;
     return v;
   };
-  return () => _();
+  return a => _(a);
 };
 export const Mutable = v =>
   ObjectFreeze({
@@ -83,10 +83,10 @@ export const R_M = get_f => {
  * @returns Object indicating if the loop was broken (break = true) or completed (break = false)
  */
 export const ForEach = (iterable, callback) => {
-  const _break = Symbol('break');
+  const Break = Symbol('break');
   let i = 0;
   for (const v of iterable) {
-    if (callback(v, i, iterable, _break) === _break) {
+    if (callback(v, { i, iterable, Break }) === Break) {
       return {
         break: true,
       };
@@ -97,6 +97,36 @@ export const ForEach = (iterable, callback) => {
     break: false,
   };
 };
+
+/**
+ * Needs further thought
+ */
+export const PipeBreakable =
+  (...fns) =>
+  init => {
+    let v = init;
+    ForEach(fns, (f, { Break }) => {
+      if (typeof f === 'function') v = f(v);
+      else v = f.f(v, Break);
+      return v;
+    });
+    return v;
+  };
+
+// {
+//   // test for pipe breakable
+//   const pipe = PipeBreakable(
+//     n => n + 1,
+//     {
+//       // breakable
+//       f: (n, Break) => (n < 0 ? Break : `number: ${n}`),
+//     },
+//     E(Log),
+//   );
+//   pipe(1);
+//   pipe(-1);
+//   pipe(-5);
+// }
 
 export const FeedObject = (o1, o2) =>
   Object.entries(o2).forEach(([k, v]) => o1.set(k, v));
