@@ -13,6 +13,8 @@ export const V = v => f => f(v);
  * getf : self => (...args) => any
  *
  * self.f : (...args) => any
+ *
+ * Probably only use when f is meant to be mutated
  */
 export const R = get_f => {
   const self = {};
@@ -39,7 +41,7 @@ export const OnUN = (v, getV) => (v === UN ? getV() : v);
 export const Lazy = (get = I) => {
   let _ = a => {
     const v = get(a);
-    get = UN;
+    get = UN; // is this needed? maybe get is forgotten naturally after the first call
     _ = () => v;
     return v;
   };
@@ -68,6 +70,27 @@ export const MapMutable = (m, map) => {
 };
 
 export const MapMutableMK = (o, k, map) => MapMutable(MutableMK(o, k), map);
+
+export const GetSetHas = (m, k, getV) =>
+  m.has(k) ? m.get(k) : E(v => m.set(k, v))(getV());
+
+export const Inc = n => n + 1;
+export const Dec = n => n - 1;
+
+export const WithArgs =
+  f =>
+  (...args) =>
+  a =>
+    f(a, ...args);
+export const CurryNth =
+  (f, n) =>
+  (...args) =>
+  a =>
+    f(...args.slice(0, n), a, ...args.slice(n));
+
+export const IncMutable = WithArgs(MapMutable)(Inc);
+export const DecMutable = WithArgs(MapMutable)(Dec);
+
 /**
  * R-Recursion using Mutable
  *
@@ -99,7 +122,24 @@ export const ForEach = (iterable, callback) => {
 };
 
 /**
- * Needs further thought
+ * Creates a breakable pipeline of functions.
+ *
+ * @param {...Function} fns - The functions to be executed in the pipeline.
+ * @returns {Function} - A function that takes an initial value and processes it through the pipeline.
+ *
+ * @example
+ * // test for pipe breakable
+ * const pipe = PipeBreakable(
+ *   n => n + 1,
+ *   {
+ *     // breakable
+ *     f: (n, Break) => (n < 0 ? Break : `number: ${n}`),
+ *   },
+ *   E(Log),
+ * );
+ * pipe(1);  // logs and returns "number: 2"
+ * pipe(-1); // breaks the pipeline and returns 0
+ * pipe(-5); // breaks the pipeline and returns -4
  */
 export const PipeBreakable =
   (...fns) =>
@@ -113,22 +153,7 @@ export const PipeBreakable =
     return v;
   };
 
-// {
-//   // test for pipe breakable
-//   const pipe = PipeBreakable(
-//     n => n + 1,
-//     {
-//       // breakable
-//       f: (n, Break) => (n < 0 ? Break : `number: ${n}`),
-//     },
-//     E(Log),
-//   );
-//   pipe(1);
-//   pipe(-1);
-//   pipe(-5);
-// }
-
-export const FeedObject = (o1, o2) =>
+export const FeedObjectToMap = (o1, o2) =>
   Object.entries(o2).forEach(([k, v]) => o1.set(k, v));
 
 export const MapToObj = m => Object.fromEntries(m.entries());
@@ -201,7 +226,6 @@ export const StringSplice = (s, start, deleteCount, insert = '') =>
   `${s.slice(0, start)}${insert}${s.slice(start + deleteCount)}`;
 
 // wrappers or specific functions
-
 export const LocalStorage = {
   get: k => localStorage.getItem(k),
   set: (k, v) => localStorage.setItem(k, v),
@@ -234,7 +258,11 @@ export const Signal = (v, f = Void) => {
     get: value.get,
     set: v => {
       value.set(v);
-      (f => f && f(v))(event.get());
+      // (f => f && f(v))(event.get());
+      const _event = event.get();
+      if (typeof _event === 'function') _event(v);
+      else if (typeof _event.f === 'function') _event.f(_ => _event.data, v);
+      else Emit(_event, v);
     },
     event,
   });
