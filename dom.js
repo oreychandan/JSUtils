@@ -16,14 +16,17 @@ const get_set_multi_fn = set_fn => {
   const set_sig = get_set_sig_fn(set_fn);
   return [
     set_sig,
-    _.R(set_multi => (el, data) => {
-      if (typeof data === 'function') data(d => set_multi.f(el, d));
-      else {
-        Object.entries(data).forEach(([k, v]) =>
-          (typeof v === 'function' ? set_sig : set_fn)(el, k, v)
-        );
-      }
-    }),
+    _.Do(
+      set_multi =>
+        (set_multi = (el, data) => {
+          if (typeof data === 'function') data(d => set_multi(el, d));
+          else {
+            Object.entries(data).forEach(([k, v]) =>
+              (typeof v === 'function' ? set_sig : set_fn)(el, k, v)
+            );
+          }
+        })
+    ),
   ];
 };
 
@@ -34,7 +37,7 @@ export const StylesToString = styles =>
   Object.entries(styles)
     .map(([k, v]) => StyleToString(k, v))
     .join('');
-export const StyleSheet = styles => 
+export const StyleSheet = styles =>
   Object.entries(styles)
     .map(([k, v]) => `${k} { ${StylesToString(GetStyles(v))} }`)
     .join('');
@@ -88,7 +91,8 @@ const _getActionMap = options => ({
 });
 
 export const H = options => {
-  if (typeof options === 'string') return options;
+  if (typeof options === 'string') return options; // textNode
+  if (typeof options.comment === 'string') return Comment(options.comment);
   if (options.el === _.UN)
     options.el = options.isSvg
       ? SVG(_.OnUN(options.tag, _.K('svg')))
